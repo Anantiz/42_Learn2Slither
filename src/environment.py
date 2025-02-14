@@ -18,7 +18,7 @@ class Environment:
             raise ValueError("Simulator must inherit from class Simulator")
         self.simulator = simulator
 
-    def run(self, epoch=500):
+    def run(self, epoch=10_000):
         '''
         Will execute one round of:
         - init_episode() from the simulator
@@ -46,6 +46,7 @@ class Environment:
                     epoch -= 1
                     # print(f"remaining_epoch={epoch}")
                     initial_state, actions = self.simulator.init_episode()
+            self.agent.save_neural_network()
         except Exception as e:
             print(f"{RED}Environment couldn't run(): {RESET}{e}")
             return

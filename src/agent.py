@@ -85,9 +85,9 @@ class Agent:
         """Load the neural network from a file"""
         pass
 
-    def save_neural_network(self, path):
+    def save_neural_network(self, path="model_weights.pth"):
         """Save the neural network to a file"""
-        pass
+        torch.save(self.dqn.state_dict(), path)
 
     def init_episode(self, initial_state: torch.tensor, actions: list[int], learning_on=True):
         """ Initialize the agent for an episode """
@@ -107,7 +107,7 @@ class Agent:
         Update the policy with the buffer
         buffer of shape: [s, a, r, s']
         """
-        print(f"Updating policy with {len(self.buffer)} samples")
+        # print(f"Updating policy with {len(self.buffer)} samples")
         # The terminal value will be [last_state_before_death, fatal_action, reward_of_death, None]
         for s, a, r, s_prime in self.buffer:
             q_value = self.dqn(s)[a].unsqueeze(0)
