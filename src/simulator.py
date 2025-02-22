@@ -40,40 +40,16 @@ class SnakeSimulator(Simulator):
     Coordinates are between 0 and map_size - 1
     '''
 
-    # Don't change this
-    action_map = {
-        0 : "up",
-        1 : "left",
-        2 : "down",
-        3 : "right"
-    }
-
-    action_map_rev = {
-        "up" : 0,
-        "left" : 1,
-        "down" : 2,
-        "right" : 3
-    }
-
+    action_map = { 0 : "up", 1 : "left", 2 : "down", 3 : "right"} # Don't change the values
     action_result = {"dead-wall", "dead-self", "dead-red-apple", "red-apple", "green-apple", "nothing"}
-
     rewards = {
         "dead-wall": -100,
         "dead-self": -100,
         "dead-red-apple": -50,
         "red-apple": -10,
-        "green-apple": 50,
+        "green-apple": 100,
         "nothing": 0.05
     }
-
-    # rewards = {
-    #     "dead-wall": -1000,
-    #     "dead-self": -1000,
-    #     "dead-red-apple": -300,
-    #     "red-apple": -250,
-    #     "green-apple": 100,
-    #     "nothing": 0.5
-    # }
 
     def __init__(self, map_size=10, snake_len=3):
         self.map_size = map_size
@@ -87,14 +63,18 @@ class SnakeSimulator(Simulator):
         """ Return: (State-size, Action-size) """
         return (4, 4), 4
 
-    def display_map_cli(self):
+    def display_map_cli(self, snake_vision_only=False):
         """TODO: Be careful, you are not allowed to turn in this, it should only display the snake vision"""
+        snake_head_x, snake_head_y = self.snake_body[0]
         print(f"{BOLD}", end="")
         print("W" * (self.map_size + 2), end="")
         print(f"{RESET}")
         for y in range(self.map_size):
             print(f"{BOLD}W{RESET}", end="")
             for x in range(self.map_size):
+                if x != snake_head_x and y != snake_head_y:
+                    print("?", end="")
+                    continue
                 pos = (x, y)
                 if pos in self.snake_body:
                     print(f"{BLUE}H{RESET}" if pos == self.snake_body[0] else f"{CYAN}S{RESET}", end="")
@@ -103,7 +83,7 @@ class SnakeSimulator(Simulator):
                 elif pos in self.red_apple_pos:
                     print(f"{RED}R{RESET}", end="")
                 else:
-                    print("0", end="")
+                    print(f"{YELLOW}0{RESET}", end="")
             print(f"{BOLD}W{RESET}")
         print(f"{BOLD}", end="")
         print("W" * (self.map_size + 2), end="")
@@ -277,16 +257,16 @@ class SnakeSimulator(Simulator):
         state[3][3] = self.map_size - head_x
         return state, self.done
 
-    def init_episode(self) -> tuple[torch.tensor, list[int]]:
+    def init_episode(self, green_apple_count=2, red_apple_count=1, initial_size=3) -> tuple[torch.tensor, list[int]]:
         """
         called to initialize the simulator and get the initial state and possible actions
         """
         self.ticks = 0
-        self.spawn_snake()
+        self.spawn_snake(initial_size=initial_size)
         self.green_apple_pos.clear()
         self.red_apple_pos.clear()
-        self.spawn_green_apple(8)
-        self.spawn_red_apple()
+        self.spawn_green_apple(green_apple_count)
+        self.spawn_red_apple(red_apple_count)
         self.done = False
         self.last_action = None
         return self.get_state(), [0, 1, 2, 3]
@@ -321,7 +301,7 @@ class SnakeSimulator(Simulator):
             return self.rewards[r]
         # Reward if the direction is
         if self.check_if_apple_in_dir(self.green_apple_pos, action):
-            return self.rewards["green-apple"] / 10
+            return self.rewards["green-apple"] / 15
         if self.check_if_apple_in_dir(self.red_apple_pos, action):
             return self.rewards["red-apple"] / 10
         return self.rewards[r]
@@ -343,7 +323,6 @@ class SnakeSimulator(Simulator):
         if result in {"dead-wall", "dead-self", "dead-red-apple", None}:
             self.done = True
         return self.generate_json_frame()
-
 
     def step(self, action: int, max_tick=-100) -> tuple[torch.tensor, list[int]]:
         """

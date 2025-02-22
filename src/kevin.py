@@ -40,7 +40,7 @@ class Dqn(nn.Module):
             print(f"Creating a neural network with input shape: {input_shape} and output count: {action_dim}")
         self.input_shape = input_shape
         input_size = input_shape[0] * input_shape[1]
-        scale = 16
+        scale = 32
         self.fc1 = nn.Linear(input_size, 1 * scale)
         self.fc2 = nn.Linear(1 * scale, 2 * scale)
         self.fc3 = nn.Linear(2 * scale, 4 * scale)
@@ -62,7 +62,7 @@ class Kevin:
     - Manages updating the neural network
     - Can compute the Q-values for you and return the best action
     '''
-    def __init__(self, input_shape: tuple, action_dim: int, load_model:str=None, lr=0.003, gamma=0.95, epsilon=1.0, min_epsilon=0.01, decay=0.995, target_update_freq=25):
+    def __init__(self, input_shape: tuple, action_dim: int, load_model:str=None, lr=0.003, gamma=0.95, epsilon=1.0, min_epsilon=0.01, decay=0.995, target_update_freq=50):
         ''' Hi I'm Kevin ! '''
         if load_model is not None:
             self.dqn = torch.load(load_model)
@@ -79,7 +79,7 @@ class Kevin:
         self.decay = decay
         self.optimizer = torch.optim.Adam(self.dqn.parameters(), lr=self.lr)
 
-        self.dqn_target = Dqn(input_shape, action_dim)
+        self.dqn_target = Dqn(input_shape, action_dim, skip_init=True)
         self.dqn_target.load_state_dict(self.dqn.state_dict())
         self.target_update_freq = target_update_freq
         self.target_update_counter = 0

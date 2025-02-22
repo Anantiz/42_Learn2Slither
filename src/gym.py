@@ -75,7 +75,7 @@ class Gym:
                 p.join()
             return list(shared_experiences)
 
-    def train(self, epoch=600, batch_size=64):
+    def train(self, epoch=1000, batch_size=256):
         mod = 10
         if epoch >= 500:
             mod = 50
@@ -91,7 +91,7 @@ class Gym:
             self.brain.share_memory()
             batch_count = self.cpu_count * 2
         else:
-            batch_count = 1
+            batch_count = 16
             sim = self.sim_generator()
 
         experiences:list[tuple[Tensor, int, float, Tensor]] = list()
@@ -103,10 +103,10 @@ class Gym:
                     experiences.extend(self._parallel_manager(sim_pool, batch_size * 2))
             if e % mod == 0:
                 average_reward = sum([exp[2] for exp in experiences]) / len(experiences)
-                print(f"Epoch {e} done, average reward: {average_reward}, epsilon: {self.brain.epsilon}, exp_len: {len(experiences)}")
+                print(f"Epoch {e:0.2f} done, average reward: {average_reward}, epsilon: {self.brain.epsilon:0.4f}, exp_len: {len(experiences)}")
             self.brain.update(experiences, batch_size=batch_size)
             experiences.clear()
-        print(f"Epoch {epoch} done, average reward: {average_reward:.2f}, epsilon: {self.brain.epsilon}")
+        print(f"Epoch {epoch} done, average reward: {average_reward:0.2f}, epsilon: {self.brain.epsilon:0.4f}")
         self.brain.save_weights() # I already have a Gazillion kevins and maurice in my directory
 
     def test(self, cli_map=False, max_tick=1500):
@@ -124,26 +124,44 @@ class Gym:
                 s, done = sim.get_state()
                 if done: break
                 if cli_map:
-                    sim.display_map_cli()
+                    sim.display_map_cli(snake_vision_only=True)
                 r += sim.step(self.brain.qna(s, learning_on=False), max_tick=max_tick)
         ticks = sim.ticks
         snake_len = sim.snake_len
         print(f"{colors.CYAN}Simulation ended after {ticks} ticks, with a size of {snake_len}, average reward {r/ticks}{colors.RESET}")
 
-    def test_record(self, record_file_path=None, max_tick=1500) -> str:
+    def test_record(self, record_file_path=None, max_tick=1500, min_acepted_snake_len=0, min_accepted_tick=0, max_retries=5) -> str:
         '''
-        Saves a Json record of the simulation for each step
+        Saves a Json record of the simulation for each step.
+        :param record_file_path: the path to save the record file
+        :param max_tick: the maximum number of ticks before the simulation ends
+        :param min_acepted_snake_len: the minimum snake size to accept the record
+        :param min_accepted_tick: the minimum number of ticks to accept the record
+        :param max_retries: the maximum number of retries before accepting the record regardless of the conditions
         returns: the path to the record file
         '''
         frames = []
+        max_len = 0
+        redo = True
         sim = self.sim_generator()
-        sim.init_episode()
-        with torch.no_grad():
-            while True:
-                s, done = sim.get_state()
-                if done: break
-                a = self.brain.qna(s, learning_on=False)
-                frames.append(sim.step_record(a, max_tick=max_tick))
+        while redo:
+            sim.init_episode()
+            with torch.no_grad():
+                while True:
+                    s, done = sim.get_state()
+                    if done: break
+                    a = self.brain.qna(s, learning_on=False)
+                    frames.append(sim.step_record(a, max_tick=max_tick))
+                    max_len = max(max_len, sim.snake_len)
+            redo = False
+            if len(frames) < min_accepted_tick or max_len < min_acepted_snake_len:
+                redo = True
+                frames.clear()
+                if max_retries == 0:
+                    print(f"{colors.RED}Max retries reached without satisfaction, record not saved{colors.RESET}")
+                    return None
+                max_retries -= 1
+
         try:
             if record_file_path is None:
                 record_file_path = f"records/record_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.json"

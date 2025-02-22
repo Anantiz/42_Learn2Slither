@@ -9,7 +9,7 @@ We will load a json file that contains individual game-states and render them on
 
 class Visualizer:
 
-    def __init__(self, width:int=800, height:int=600, snake_color=(0, 255, 0), red_color=(255, 0, 0), green_color=(0, 255, 0), background_color=(0, 0, 0)):
+    def __init__(self, width:int=800, height:int=600, default_render_speed=0.5, snake_color=(0, 0, 255), red_color=(255, 0, 0), green_color=(0, 255, 0), background_color=(0, 0, 0)):
         ''' '''
         if width < 400 or height < 400:
             raise ValueError("Window size is too small")
@@ -30,6 +30,7 @@ class Visualizer:
         self.current_frame = 0
         self.frames = None
         self.auto_render_speed = 0.8
+        self.default_render_speed = default_render_speed
 
         self.red_color = red_color
         self.green_color = green_color
@@ -65,7 +66,6 @@ class Visualizer:
         self.current_frame = 0
         self.last_frame_index = len(self.frames) - 1
         print(f"Loaded {len(self.frames)} frames")
-        exit(0)
 
 
     def generate_frame(self, index:int):
@@ -130,13 +130,13 @@ class Visualizer:
         Will change the simulation speed
         '''
         self.auto_render_speed += speed
-        if self.auto_render_speed < 0.25:
-            self.auto_render_speed = 0.25
-        elif self.auto_render_speed > 2:
-            self.auto_render_speed = 2
+        if self.auto_render_speed < 0.5:
+            self.auto_render_speed = 0.5
+        elif self.auto_render_speed > 4:
+            self.auto_render_speed = 4
         print(f"Simulation speed: {self.auto_render_speed} fps")
 
-    def start_visualizer(self):
+    def start(self):
         '''
         Will start the rendering loop
         '''
@@ -156,6 +156,8 @@ class Visualizer:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
+                    print("Exiting")
+                    break
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
                         running = False
@@ -163,19 +165,25 @@ class Visualizer:
                         if not mode:
                             self.step_backward()
                             update = True
-                        else: self.sim_speed(-0.25)
+                        else: self.sim_speed(-0.5)
                     elif event.key == pygame.K_RIGHT:
                         if not mode:
                             self.step_forward()
                             update = True
-                        else: self.sim_speed(0.25)
+                        else: self.sim_speed(0.5)
                     elif event.key == pygame.K_SPACE:
                         mode = not mode
+                        print(f"Mode: {'Auto' if mode else 'Manual'}")
             screen.fill((0, 0, 0))
             if mode or update or not surface:
-                surface = self.generate_frame(self.current_frame)
+                if mode: surface = self.step_forward()
+                else: surface = self.generate_frame(self.current_frame)
                 update = False
-            screen.blit(surface, (0, 0))
+            if surface:
+                screen.blit(surface, (0, 0))
+            else:
+                print("No frame to render")
+                mode = False
             pygame.display.flip()
-            if not mode: clock.tick(1)
-            else: clock.tick(self.auto_render_speed)
+            clock.tick((self.auto_render_speed if mode else self.default_render_speed))
+        pygame.quit()
