@@ -1,4 +1,5 @@
 import random
+import os
 from torch import Tensor
 from datetime import datetime
 
@@ -29,7 +30,9 @@ class Maurice:
 
     def save_weights(self, path:str=None):
         if not path:
-            path = f"maurice_qtable_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.pt"
+            path = f"saves/maurice/maurice_qtable_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.pt"
+            if not os.path.exists("saves/maurice"):
+                os.makedirs("saves/maurice")
         with open(path, "w") as f:
             for row in self.qtable:
                 f.write(" ".join([str(x) for x in row]) + "\n")

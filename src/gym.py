@@ -1,15 +1,18 @@
-from simulator import Simulator
 import os
-
-from kevin import Kevin
-from maurice import Maurice
-
-import threading
-import colors
+from time import sleep
+import multiprocessing
+from multiprocessing import Process, Queue
 import torch
 from torch import Tensor
 
+import colors
+from kevin import Kevin
+from maurice import Maurice
+from simulator import Simulator
+
+
 class Gym:
+
     def __init__(self, brain, sim_generator:callable, cpu_count:int=1):
         '''
         :param brain: the class that handles the Agents and Neural Network
@@ -28,7 +31,7 @@ class Gym:
         self.cpu_count = cpu_count # Hopefully you won't rip a core out while running this
         self.brain = brain
 
-    def run_episode(self, agent, sim, learning_on=True) -> list[tuple[Tensor, int, float, Tensor]]:
+    def run_episode(self, agent, sim) -> list[tuple[Tensor, int, float, Tensor]]:
         '''
         Will use the given simulator instance and agent instance to run an episode.
         : return: a list of tuples (state:torch.tensor, action:int, reward:float)
@@ -48,47 +51,57 @@ class Gym:
             prev_state = (state, action, reward)
         return buff
 
-    def _thread_worker(self, agent, sim, results:list, learning_on=True):
+    def _parallel_worker(self, agent, sim, shared_queue:Queue, requested_experiences_count:int=64):
         '''
         Wrapper for the run_episode method to be used in a thread
         '''
-        buff = self.run_episode(agent, sim)
-        results.extend(buff)
+        buff:list = []
+        while len(buff) < requested_experiences_count:
+            buff.extend(self.run_episode(agent, sim))
+        print(f"{colors.YELLOW}Sending buffer of length {len(buff)} to the shared queue{colors.RESET}")
+        shared_queue.put(buff)
 
-    def train(self, epoch=5000, batch_size=64):
+    def train(self, epoch=100, batch_size=64):
         mod = 10
-        if epoch >= 400:
+        if epoch >= 500:
             mod = 50
-        elif epoch >= 1000:
+        if epoch >= 1000:
             mod = 100
+        if isinstance(self.brain, Maurice): # Cuz maurice is a Q-table, he don't do certain things
+            self.cpu_count = 1 # No need for threads
+            self.batch_size = 8 # No need for batches, q-tables have independent updates
 
-        experiences:list[tuple[Tensor, int, float, Tensor]] = list()
-
+        print(f"{colors.GREEN}Training for {epoch} epochs, with a batch size of {batch_size}, and {self.cpu_count} workers{colors.RESET}")
         if self.cpu_count > 1:
             sim_pool = [self.sim_generator() for _ in range(self.cpu_count)]
+            shared_queue = Queue(maxsize=self.cpu_count)
+            self.brain.share_memory()
         else:
             sim = self.sim_generator()
 
-        if isinstance(self.brain, Maurice): # Cuz maurice is a Q-table, he don't do certain things
-            self.cpu_count = 1 # No need for threads
-            self.batch_size = 1 # No need for batches, q-tables have independent updates
-
+        experiences:list[tuple[Tensor, int, float, Tensor]] = list()
         for e in range(epoch):
-            while len(experiences) < batch_size * 2:
+            while len(experiences) < batch_size * self.cpu_count:
                 if self.cpu_count == 1:
                     experiences.extend(self.run_episode(self.brain, sim))
                 else:
-                    threads = []
+                    processes = []
                     for sim_id in range(self.cpu_count):
-                        sim = sim_pool[sim_id]
-                        thread = threading.Thread(target=self._thread_worker, args=(self.brain, sim, experiences))
-                        threads.append(thread)
-                        thread.start()
-                    for thread in threads:
-                        thread.join()
+                        p = Process(target=self._parallel_worker, args=(self.brain, sim_pool[sim_id], shared_queue, batch_size))
+                        processes.append(p)
+                        p.start()
+                    for cid in range(self.cpu_count):
+                        print(f"{colors.YELLOW}Waiting for process {processes[cid].pid} to finish{colors.RESET}")
+                        buff = shared_queue.get()
+                        experiences.extend(buff)
+                    for p in processes:
+                        p.join()
+                        if not p.is_alive():
+                            print(f"Process {p.pid} terminated unexpectedly!")
+
             if e % mod == 0:
                 average_reward = sum([exp[2] for exp in experiences]) / len(experiences)
-                print(f"Epoch {e} done, average reward: {average_reward}, epsilon: {self.brain.epsilon}")
+                print(f"Epoch {e} done, average reward: {average_reward}, epsilon: {self.brain.epsilon}, exp_len: {len(experiences)}")
             self.brain.update(experiences, batch_size=batch_size)
             experiences.clear()
         print(f"Epoch {epoch} done, average reward: {average_reward}, epsilon: {self.brain.epsilon}")

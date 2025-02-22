@@ -4,6 +4,7 @@ import datetime
 from numpy.random import randint
 
 import random
+import os
 
 def sampler_stochastic(experiences: list, batch_size) -> list[list]:
     '''
@@ -22,14 +23,21 @@ def sampler_stochastic(experiences: list, batch_size) -> list[list]:
 
 
 class Dqn(nn.Module):
-    def __init__(self, input_shape: tuple, action_dim: int):
+
+    def __init__(self, input_shape: tuple, action_dim: int, skip_init=False):
+        '''
+        :param input_shape: the shape of the input tensor
+        :param action_dim: the number of actions the agent can take
+        :param skip_init: if True, the model will not be initialized, useful for loading a model from a file
+        '''
         super().__init__()
         if not isinstance(input_shape, tuple):
             raise ValueError("Input shape must be a tuple")
         if not (0 < len(input_shape) < 3):
             raise ValueError("Input shape must be a first or second order tensor")
 
-        print(f"Creating a neural network with input shape: {input_shape} and output count: {action_dim}")
+        if not skip_init:
+            print(f"Creating a neural network with input shape: {input_shape} and output count: {action_dim}")
         self.input_shape = input_shape
         input_size = input_shape[0] * input_shape[1]
         scale = 16
@@ -54,7 +62,7 @@ class Kevin:
     - Manages updating the neural network
     - Can compute the Q-values for you and return the best action
     '''
-    def __init__(self, input_shape: tuple, action_dim: int, load_model:str=None, lr=0.003, gamma=0.95, epsilon=1.0, min_epsilon=0.01, decay=0.995):
+    def __init__(self, input_shape: tuple, action_dim: int, load_model:str=None, lr=0.003, gamma=0.95, epsilon=1.0, min_epsilon=0.01, decay=0.995, target_update_freq=25):
         ''' Hi I'm Kevin ! '''
         if load_model is not None:
             self.dqn = torch.load(load_model)
@@ -71,12 +79,22 @@ class Kevin:
         self.decay = decay
         self.optimizer = torch.optim.Adam(self.dqn.parameters(), lr=self.lr)
 
+        self.dqn_target = Dqn(input_shape, action_dim)
+        self.dqn_target.load_state_dict(self.dqn.state_dict())
+        self.target_update_freq = target_update_freq
+        self.target_update_counter = 0
+
     def save_weights(self, path:str=None):
         if not path:
-            timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-            path = f"kevin_nn_{timestamp}.pt"
+            path = f"saves/kevin/kevin_nn_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.pt"
+            if not os.path.exists("saves/kevin"):
+                os.makedirs("saves/kevin")
         torch.save(self.dqn, path)
         print(f"Saved Kevin brain as: {path}")
+
+    def share_memory(self):
+        self.dqn.share_memory()
+        self.dqn_target.share_memory()
 
     def update(self, experiences:list[tuple[Tensor, int, float, Tensor]], batch_size=32):
         """
@@ -90,6 +108,12 @@ class Kevin:
         Returns:
             None
         """
+        def target_update():
+            ''' Soft update the target network '''
+            self.target_update_counter += 1
+            if self.target_update_counter % self.target_update_freq == 0:
+                self.dqn_target.load_state_dict(self.dqn.state_dict())
+
         batches = sampler_stochastic(experiences, batch_size)
         for batch in batches:
             if len(batch) == 0: # What ?
@@ -111,7 +135,7 @@ class Kevin:
             q_values = q_values.gather(1, actions.unsqueeze(1)).squeeze(1)
 
             with torch.no_grad():
-                next_q_values = self.dqn(next_states)
+                next_q_values = self.dqn_target(next_states)
                 next_q_values = next_q_values.max(1)[0].detach()
 
             target = rewards + self.gamma * next_q_values * Tensor(done_mask)
@@ -123,6 +147,7 @@ class Kevin:
                 param.grad.data.clamp_(-1, 1)
             self.optimizer.step()
         self.epsilon = max(self.min_epsilon, self.epsilon * self.decay) # Decay epsilon as the nn learns
+        target_update()
 
     def qna(self, state:Tensor, learning_on=True) -> int:
         ''' Q-values and action, I'm so funny bruh '''
