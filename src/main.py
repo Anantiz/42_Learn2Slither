@@ -6,6 +6,7 @@ import os
 
 from colors import *
 from simulator import Simulator, SnakeSimulator
+from visualizer import Visualizer
 from gym import Gym
 from kevin import Kevin
 from maurice import Maurice
@@ -35,7 +36,7 @@ def get_brain(file=None, type="kevin"):
     state_shape, action_count = SnakeSimulator().get_io_shape()
     if type == "kevin":
         if file:
-            return Kevin(state_shape, action_count, load_model=file, lr=0.003, decay=0.9995, epsilon=0.45)
+            return Kevin(state_shape, action_count, load_model=file, lr=0.003, decay=0.995, epsilon=0.35)
         else:
             return Kevin(state_shape, action_count, lr=0.005, decay=0.995)
     elif type == "maurice":
@@ -48,28 +49,39 @@ def get_brain(file=None, type="kevin"):
 
 def main(ac:int=0, av:str=None):
     file = None
-    action = ""
+    action = "train_test"
+    action = "visualize"
     # action = "test"
     # file = r"maurice_qtable_2025-02-21_19-20-50.pt"
-    # file = r"saves/kevin/kevin_nn_2025-02-22_14-55-33.pt"
+    file = r"saves/kevin/kevin_nn_2025-02-22_17-22-53.pt"
     try:
         brain = get_brain(file=file, type="kevin")
-        gym = Gym(brain, lambda: SnakeSimulator(), 2)
+        gym = Gym(brain, lambda: SnakeSimulator(), 4)
         if action == "train":
             gym.train()
         elif action == "test":
-            gym.test(map_cli=True)
-            # gym.test()
-            # gym.test()
-            # gym.test()
-            # gym.test()
-        else:
+            # gym.test(map_cli=True)
+            gym.test()
+            gym.test()
+            gym.test()
+            gym.test()
+        elif action == "train_test":
             gym.train()
             gym.test()
             gym.test()
             gym.test()
             gym.test()
             gym.test()
+        elif action == "visualize":
+            path = gym.test_record()
+
+            if path:
+                visualizer = Visualizer()
+                visualizer.load_game(path)
+                return
+                visualizer.start_visualizer()
+        else:
+            print(f"{RED}Unknown action: {action}")
     except Exception as e:
         print(f"{RED}Exception occured in main branch: {RESET}{e}")
         traceback.print_exc()

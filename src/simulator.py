@@ -109,6 +109,18 @@ class SnakeSimulator(Simulator):
         print("W" * (self.map_size + 2), end="")
         print(f"{RESET}\n")
 
+    def generate_json_frame(self):
+        """
+        Will return a dictionary representing the current state of the game
+        """
+        return {
+            "id": self.ticks,
+            "msize": [self.map_size, self.map_size],
+            "snake": list(self.snake_body),
+            "green": list(self.green_apple_pos),
+            "red": list(self.red_apple_pos)
+        }
+
     def spawn_snake(self, initial_size=3):
         """
         :param initial_size: initial size of the snake
@@ -314,6 +326,25 @@ class SnakeSimulator(Simulator):
             return self.rewards["red-apple"] / 10
         return self.rewards[r]
 
+    def step_record(self, action: int, max_tick=1500) -> tuple[bool, dict]:
+        """
+        :param action: action taken by the agent
+        :max_tick: maximum number of ticks before the game ends
+        return: done, frame
+        """
+        if action not in {0, 1, 2, 3}:
+            print(f"Simulator can't step invalid action")
+            raise ValueError
+        self.ticks += 1
+        if self.ticks == max_tick:
+            self.done = True
+            return self.generate_json_frame()
+        result = self.move_snake(action)
+        if result in {"dead-wall", "dead-self", "dead-red-apple", None}:
+            self.done = True
+        return self.generate_json_frame()
+
+
     def step(self, action: int, max_tick=-100) -> tuple[torch.tensor, list[int]]:
         """
         :param action: action taken by the agent
@@ -326,7 +357,6 @@ class SnakeSimulator(Simulator):
         self.ticks += 1
         if max_tick < 0: # Training
             if self.ticks > max_tick * -(self.snake_len - 2):
-                # print(f"{RED}Game too long{RESET}: {self.snake_len}")
                 self.done = True
         elif self.ticks == max_tick:
             self.done = True

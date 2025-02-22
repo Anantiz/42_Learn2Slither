@@ -1,9 +1,9 @@
 import os
-from time import sleep
-import multiprocessing
-from multiprocessing import Process, Queue
 import torch
+import datetime
+import json
 from torch import Tensor
+from multiprocessing import Process, Manager
 
 import colors
 from kevin import Kevin
@@ -51,17 +51,31 @@ class Gym:
             prev_state = (state, action, reward)
         return buff
 
-    def _parallel_worker(self, agent, sim, shared_queue:Queue, requested_experiences_count:int=64):
+    def _parallel_worker(self, agent, sim, requested_experiences_count, shared_experiences, lock):
         '''
         Wrapper for the run_episode method to be used in a thread
         '''
         buff:list = []
         while len(buff) < requested_experiences_count:
             buff.extend(self.run_episode(agent, sim))
-        print(f"{colors.YELLOW}Sending buffer of length {len(buff)} to the shared queue{colors.RESET}")
-        shared_queue.put(buff)
+        with lock:
+            shared_experiences.extend(buff)
 
-    def train(self, epoch=100, batch_size=64):
+    def _parallel_manager(self, sim_pool, batch_size) -> list[tuple[Tensor, int, float, Tensor]]:
+        with Manager() as manager:
+            shared_experiences = manager.list()  # Shared memory list
+            lock = manager.Lock()  # Synchronization lock
+
+            processes = []
+            for sim_id in range(self.cpu_count):
+                p = Process(target=self._parallel_worker, args=(self.brain, sim_pool[sim_id], batch_size, shared_experiences, lock))
+                processes.append(p)
+                p.start()
+            for p in processes:
+                p.join()
+            return list(shared_experiences)
+
+    def train(self, epoch=600, batch_size=64):
         mod = 10
         if epoch >= 500:
             mod = 50
@@ -74,41 +88,31 @@ class Gym:
         print(f"{colors.GREEN}Training for {epoch} epochs, with a batch size of {batch_size}, and {self.cpu_count} workers{colors.RESET}")
         if self.cpu_count > 1:
             sim_pool = [self.sim_generator() for _ in range(self.cpu_count)]
-            shared_queue = Queue(maxsize=self.cpu_count)
             self.brain.share_memory()
+            batch_count = self.cpu_count * 2
         else:
+            batch_count = 1
             sim = self.sim_generator()
 
         experiences:list[tuple[Tensor, int, float, Tensor]] = list()
         for e in range(epoch):
-            while len(experiences) < batch_size * self.cpu_count:
+            while len(experiences) < batch_size * batch_count:
                 if self.cpu_count == 1:
                     experiences.extend(self.run_episode(self.brain, sim))
                 else:
-                    processes = []
-                    for sim_id in range(self.cpu_count):
-                        p = Process(target=self._parallel_worker, args=(self.brain, sim_pool[sim_id], shared_queue, batch_size))
-                        processes.append(p)
-                        p.start()
-                    for cid in range(self.cpu_count):
-                        print(f"{colors.YELLOW}Waiting for process {processes[cid].pid} to finish{colors.RESET}")
-                        buff = shared_queue.get()
-                        experiences.extend(buff)
-                    for p in processes:
-                        p.join()
-                        if not p.is_alive():
-                            print(f"Process {p.pid} terminated unexpectedly!")
-
+                    experiences.extend(self._parallel_manager(sim_pool, batch_size * 2))
             if e % mod == 0:
                 average_reward = sum([exp[2] for exp in experiences]) / len(experiences)
                 print(f"Epoch {e} done, average reward: {average_reward}, epsilon: {self.brain.epsilon}, exp_len: {len(experiences)}")
             self.brain.update(experiences, batch_size=batch_size)
             experiences.clear()
-        print(f"Epoch {epoch} done, average reward: {average_reward}, epsilon: {self.brain.epsilon}")
+        print(f"Epoch {epoch} done, average reward: {average_reward:.2f}, epsilon: {self.brain.epsilon}")
         self.brain.save_weights() # I already have a Gazillion kevins and maurice in my directory
 
-
     def test(self, cli_map=False, max_tick=1500):
+        '''
+        Test the model without training
+        '''
         sim = self.sim_generator()
         sim.init_episode()
 
@@ -125,3 +129,30 @@ class Gym:
         ticks = sim.ticks
         snake_len = sim.snake_len
         print(f"{colors.CYAN}Simulation ended after {ticks} ticks, with a size of {snake_len}, average reward {r/ticks}{colors.RESET}")
+
+    def test_record(self, record_file_path=None, max_tick=1500) -> str:
+        '''
+        Saves a Json record of the simulation for each step
+        returns: the path to the record file
+        '''
+        frames = []
+        sim = self.sim_generator()
+        sim.init_episode()
+        with torch.no_grad():
+            while True:
+                s, done = sim.get_state()
+                if done: break
+                a = self.brain.qna(s, learning_on=False)
+                frames.append(sim.step_record(a, max_tick=max_tick))
+        try:
+            if record_file_path is None:
+                record_file_path = f"records/record_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.json"
+                if not os.path.exists("records"):
+                    os.makedirs("records")
+            with open(record_file_path, "w") as f:
+                f.write(json.dumps(frames))
+        except Exception as e:
+            print(f"An error occured while saving the record: {e}")
+            return None
+        print(f"{colors.CYAN}Record saved as: {record_file_path}{colors.RESET}")
+        return record_file_path
