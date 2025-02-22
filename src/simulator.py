@@ -61,10 +61,19 @@ class SnakeSimulator(Simulator):
         "dead-wall": -100,
         "dead-self": -100,
         "dead-red-apple": -50,
-        "red-apple": -2,
-        "green-apple": 10,
-        "nothing": 0.1
+        "red-apple": -10,
+        "green-apple": 50,
+        "nothing": 0.05
     }
+
+    # rewards = {
+    #     "dead-wall": -1000,
+    #     "dead-self": -1000,
+    #     "dead-red-apple": -300,
+    #     "red-apple": -250,
+    #     "green-apple": 100,
+    #     "nothing": 0.5
+    # }
 
     def __init__(self, map_size=10, snake_len=3):
         self.map_size = map_size
@@ -72,10 +81,11 @@ class SnakeSimulator(Simulator):
         self.snake_body: deque[tuple[int, int]] = deque()
         self.green_apple_pos: set[tuple] = set()
         self.red_apple_pos: set[tuple] = set()
+        self.done = False
 
     def get_io_shape(self) -> tuple:
         """ Return: (State-size, Action-size) """
-        return (4, 4), len(self.action_map)
+        return (4, 4), 4
 
     def display_map_cli(self):
         """TODO: Be careful, you are not allowed to turn in this, it should only display the snake vision"""
@@ -198,7 +208,7 @@ class SnakeSimulator(Simulator):
             self.snake_body.appendleft(new_head_pos)
             return "nothing"
 
-    def get_state(self) -> torch.tensor:
+    def get_state(self) -> tuple[torch.tensor, bool]:
         """
         Make a 4x4 matrix:
 
@@ -206,13 +216,15 @@ class SnakeSimulator(Simulator):
         LEFT:  _
         DOWN:  _
         RIGHT: _
-
-        if something doesn't show up put distance to 0, later try -1 to check if it works better/worse
+        if something doesn't show up put distance to 0
+        :return: state tensor, done: True if the game is over
         """
 
         # You can Optimize all of this by simply searching if the apples are in the same row or column as the head
         # instead of checking all the way to the head, BUT, too lazy
         state = torch.zeros((4, 4), dtype=torch.float32)
+        if self.done:
+            return state, self.done
         head = self.snake_body[0]
         head_x, head_y = head
         # Up state[0]
@@ -251,7 +263,7 @@ class SnakeSimulator(Simulator):
             elif state[3][2] == 0 and (head_x + i, head_y) in self.snake_body:
                 state[3][2] = i
         state[3][3] = self.map_size - head_x
-        return state
+        return state, self.done
 
     def init_episode(self) -> tuple[torch.tensor, list[int]]:
         """
@@ -261,24 +273,65 @@ class SnakeSimulator(Simulator):
         self.spawn_snake()
         self.green_apple_pos.clear()
         self.red_apple_pos.clear()
-        self.spawn_green_apple(5)
+        self.spawn_green_apple(8)
         self.spawn_red_apple()
+        self.done = False
+        self.last_action = None
         return self.get_state(), [0, 1, 2, 3]
 
-    def step(self, action: int) -> tuple[torch.tensor, list[int]]:
+    def check_if_apple_in_dir(self, apple_set, dir):
+        snake_x, snake_y = self.snake_body[0]
+        match dir:
+            case 0:
+                for a in apple_set:
+                    if a[1] < snake_y:
+                        return True
+                return False
+            case 1:
+                for a in apple_set:
+                    if a[0] < snake_x:
+                        return True
+                    return False
+            case 2:
+                for a in apple_set:
+                    if a[0] > snake_x:
+                        return True
+                    return False
+            case 3:
+                for a in apple_set:
+                    if a[1] < snake_x:
+                        return True
+                    return False
+        return False
+
+    def get_reward(self, action , r) ->int:
+        if r != "nothing":
+            return self.rewards[r]
+        # Reward if the direction is
+        if self.check_if_apple_in_dir(self.green_apple_pos, action):
+            return self.rewards["green-apple"] / 10
+        if self.check_if_apple_in_dir(self.red_apple_pos, action):
+            return self.rewards["red-apple"] / 10
+        return self.rewards[r]
+
+    def step(self, action: int, max_tick=-100) -> tuple[torch.tensor, list[int]]:
         """
         :param action: action taken by the agent
+        :max_tick: maximum number of ticks before the game ends, negative values set training mode
         :return: next state and reward of last action
         """
-        if not action:
-            return self.get_state(), 0
+        if action not in {0, 1, 2, 3}:
+            print(f"Simulator can't step invalid action")
+            return 0
         self.ticks += 1
-        if self.ticks > 1000:
-            self.display_map_cli()
-            print(f"{RED}Game took too long{RESET}")
-            return None, -100
+        if max_tick < 0: # Training
+            if self.ticks > max_tick * -(self.snake_len - 2):
+                # print(f"{RED}Game too long{RESET}: {self.snake_len}")
+                self.done = True
+        elif self.ticks == max_tick:
+            self.done = True
+            return 0
         result = self.move_snake(action)
         if result in {"dead-wall", "dead-self", "dead-red-apple", None}:
-            print(f"{MAGENTA}Game ended{RESET}: ticks={self.ticks} snake_len={self.snake_len}")
-            return None, self.rewards[result]
-        return self.get_state(), (self.rewards[result] + (math.log((self.snake_len - 3)) if self.snake_len > 3 else 0))
+            self.done = True
+        return self.get_reward(action, result)
