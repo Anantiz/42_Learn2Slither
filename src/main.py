@@ -26,11 +26,13 @@ Q-learning:
 - Hopefully, that's a good overview.
 """
 
+
 def print_torch_info():
     print(f"{CYAN}PyTorch version: {torch.__version__}")
     print(f"CUDA available: {torch.cuda.is_available()}")
     print(torch.__config__.parallel_info())  # Check if MKL is enabled
     print(f"{RESET}\n")
+
 
 def get_brain(file=None, type="kevin"):
     state_shape, action_count = SnakeSimulator().get_io_shape()
@@ -46,6 +48,7 @@ def get_brain(file=None, type="kevin"):
             return Maurice(state_shape, action_count, lr=0.1)
     else:
         raise ValueError(f"Unknown brain type: {type}")
+
 
 # This docstring with a few modif could also be used as the help message for the program when used with 0 arguments
 HELP_STRING = '''
@@ -73,10 +76,11 @@ List of arguments my program has to handle:
 '''
 
 # Other things to implement:
-    # - In the visualizer, highlight the snake vision: In the 4 cardinal directions
-        # from it's head, put a gold dot in the middle of the cell.
-    # - Handle SIGINT during training, and save the model
-        # (Add an extension to the model name to indicate interruption)
+# - In the visualizer, highlight the snake vision: In the 4 cardinal directions
+# from it's head, put a gold dot in the middle of the cell.
+# - Handle SIGINT during training, and save the model
+# (Add an extension to the model name to indicate interruption)
+
 
 def init_gym(args):
     load_file = args.load_model
@@ -85,7 +89,8 @@ def init_gym(args):
     board_size = abs(int(args.board_size)) if args.board_size else 10
     lr = args.lr if args.lr else 0.1 if brain_type == "maurice" else 0.005
     decay = args.decay if args.decay else 0.995 if brain_type == "maurice" else 0.999
-    min_epsilon = max(0.01, 0.015 if args.min_epsilon is None else args.min_epsilon)
+    min_epsilon = max(
+        0.01, 0.015 if args.min_epsilon is None else args.min_epsilon)
     epsilon = max(min_epsilon, min(1, args.epsilon if args.epsilon else 1))
     gamma = max(0.1, min(0.99, args.gamma))
     target_update_freq = max(1, args.target_update_freq)
@@ -98,39 +103,45 @@ def init_gym(args):
         kwargs["render_snake_vision"] = True
     if load_file:
         if not os.path.exists(load_file):
-            raise ValueError(f"Model file not found: {load_file}, aborting training")
+            raise ValueError(
+                f"Model file not found: {load_file}, aborting training")
         if not os.access(load_file, os.R_OK):
             raise ValueError(f"Model file not readable: {load_file}, abort")
     if save_file:
         if not os.path.exists(os.path.dirname(save_file)):
-            raise ValueError(f"Directory not found for save file: {os.path.dirname(save_file)}")
+            raise ValueError(
+                f"Directory not found for save file: {os.path.dirname(save_file)}")
         if not os.access(os.path.dirname(save_file), os.W_OK):
-            raise ValueError(f"Directory not writable for save file: {os.path.dirname(save_file)}")
+            raise ValueError(
+                f"Directory not writable for save file: {os.path.dirname(save_file)}")
 
     state_shape, action_count = SnakeSimulator().get_io_shape()
     if brain_type == "kevin":
         brain = Kevin(state_shape, action_count, load_model=load_file,
-                    lr=lr, decay=decay, epsilon=epsilon, min_epsilon=min_epsilon,
-                    gamma=gamma, target_update_freq=target_update_freq)
+                      lr=lr, decay=decay, epsilon=epsilon, min_epsilon=min_epsilon,
+                      gamma=gamma, target_update_freq=target_update_freq)
     elif brain_type == "maurice":
         brain = Maurice(state_shape, action_count, load_model=load_file,
-                    lr=lr, decay=decay, epsilon=epsilon, min_epsilon=min_epsilon,
-                    gamma=gamma)
+                        lr=lr, decay=decay, epsilon=epsilon, min_epsilon=min_epsilon,
+                        gamma=gamma)
 
-    gym = Gym(brain, lambda: SnakeSimulator(board_size=board_size), cpu_count=cpus)
+    gym = Gym(brain, lambda: SnakeSimulator(
+        board_size=board_size), cpu_count=cpus)
 
     if args.train:
-            training_epochs = min(50_000, abs(args.train))
-            gym.train(training_epochs, batch_size=batch_size, save_file=args.save_model)
+        training_epochs = min(50_000, abs(args.train))
+        gym.train(training_epochs, batch_size=batch_size,
+                  save_file=args.save_model)
     elif args.test:
         if load_file is None:
             raise ValueError("Cannot test without a model")
         testing_epochs = min(abs(args.test), 1000)
         results = []
         if args.render_snake_vision:
-            testing_epochs = 1 # Don't flood the terminal with snake vision
+            testing_epochs = 1  # Don't flood the terminal with snake vision
         for _ in range(testing_epochs):
-            results.append(gym.test(max_tick=max_tick, cli_map=args.render_snake_vision, render_speed=args.render_speed))
+            results.append(gym.test(
+                max_tick=max_tick, cli_map=args.render_snake_vision, render_speed=args.render_speed))
         # result: list[tuple[ticks, end_len, r, max_len]]
         avg_ticks = sum([r[0] for r in results]) / len(results)
         avg_len = sum([r[1] for r in results]) / len(results)
@@ -151,11 +162,14 @@ def init_gym(args):
         min_accepted_tick = max(1, args.min_accepted_tick)
         max_retries = max(1, min(args.max_retries, 100))
         path = gym.test_record(max_tick=max_tick, min_acepted_snake_len=min_acepted_snake_len,
-                                min_accepted_tick=min_accepted_tick, max_retries=max_retries)
-        if path: print(f"Recorded simulation at: {path}")
-        else: print(f"Failed to record a simulation")
+                               min_accepted_tick=min_accepted_tick, max_retries=max_retries)
+        if path:
+            print(f"Recorded simulation at: {path}")
+        else:
+            print(f"Failed to record a simulation")
     elif args.visualize:
-        from visualizer import Visualizer # Here so it doesn't import pygame like a madman everytimes
+        # Here so it doesn't import pygame like a madman everytimes
+        from visualizer import Visualizer
         visualizer = Visualizer()
         visualizer.load_game(args.visualize)
         visualizer.start()
@@ -164,38 +178,58 @@ def init_gym(args):
 
 
 def main():
-    parser = argparse.ArgumentParser(description=HELP_STRING, formatter_class=argparse.RawTextHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description=HELP_STRING, formatter_class=argparse.RawTextHelpFormatter)
 
     # Mutually exclusive group (one of these must be present)
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument('--train', type=int, help='Number of epochs to train, agents learn during training')
-    group.add_argument('--test', type=int, help='Number of tests to run, agents don\'t learn during tests')
-    group.add_argument('--record', action='store_true', default=False, help='Record a simulation with format')
+    group.add_argument(
+        '--train', type=int, help='Number of epochs to train, agents learn during training')
+    group.add_argument(
+        '--test', type=int, help='Number of tests to run, agents don\'t learn during tests')
+    group.add_argument('--record', action='store_true',
+                       default=False, help='Record a simulation with format')
     group.add_argument('--visualize', type=str, help='Visualize a record file')
 
     # Optional arguments
-    parser.add_argument('--brain', choices=['maurice', 'kevin'], default='maurice', help='Specify the type of brain to use (default: Maurice)')
-    parser.add_argument('--load_model', type=str, help='Load a model from the specified path')
-    parser.add_argument('--save_model', type=str, default=None, help='Save the model to the specified path')
-    parser.add_argument('--board_size', type=int, help='Set the board size (a square board)')
-    parser.add_argument('--render_snake_vision', default=False, action='store_true', help='Render the snake vision in the CLI')
-    parser.add_argument('--render_speed', type=float, default=0.5, help='Speed of the rendering')
-    parser.add_argument('--batch_size', type=int, default=64, help='Batch size for training')
-    parser.add_argument('--cpu_count', type=int, choices=range(1, os.cpu_count()), default=1, help='Number of workers to use for training, might crash tho')
+    parser.add_argument('--brain', choices=['maurice', 'kevin'], default='maurice',
+                        help='Specify the type of brain to use (default: Maurice)')
+    parser.add_argument('--load_model', type=str,
+                        help='Load a model from the specified path')
+    parser.add_argument('--save_model', type=str, default=None,
+                        help='Save the model to the specified path')
+    parser.add_argument('--board_size', type=int,
+                        help='Set the board size (a square board)')
+    parser.add_argument('--render_snake_vision', default=False,
+                        action='store_true', help='Render the snake vision in the CLI')
+    parser.add_argument('--render_speed', type=float,
+                        default=0.5, help='Speed of the rendering')
+    parser.add_argument('--batch_size', type=int, default=64,
+                        help='Batch size for training')
+    parser.add_argument('--cpu_count', type=int, choices=range(1, os.cpu_count()),
+                        default=1, help='Number of workers to use for training, might crash tho')
     parser.add_argument('--lr', type=float, help='Learning rate for the brain')
     parser.add_argument('--decay', type=float, help='Decay rate for epsilon')
-    parser.add_argument('--epsilon', type=float, help='Initial epsilon value for the brain')
-    parser.add_argument('--min_epsilon', type=float, default=0.01, help='Minimum epsilon value for the brain')
-    parser.add_argument('--gamma', type=float, default=0.99, help='Gamma value for the brain')
-    parser.add_argument('--target_update_freq', default=25, type=int, help='Frequency to update the target network')
-    parser.add_argument('--max_tick', type=int, default=1500, help='Maximum tick for a simulation')
-    parser.add_argument('--min_acepted_snake_len', default=10, type=int, help='Minimum accepted snake length for a record')
-    parser.add_argument('--min_accepted_tick', default=50, type=int, help='Minimum accepted tick for a record')
-    parser.add_argument('--max_retries', default=5, type=int, help='Maximum retries for a record')
-    parser.add_argument('--debug', action='store_true', default=False, help='Debug mode')
+    parser.add_argument('--epsilon', type=float,
+                        help='Initial epsilon value for the brain')
+    parser.add_argument('--min_epsilon', type=float, default=0.01,
+                        help='Minimum epsilon value for the brain')
+    parser.add_argument('--gamma', type=float, default=0.99,
+                        help='Gamma value for the brain')
+    parser.add_argument('--target_update_freq', default=25,
+                        type=int, help='Frequency to update the target network')
+    parser.add_argument('--max_tick', type=int, default=1500,
+                        help='Maximum tick for a simulation')
+    parser.add_argument('--min_acepted_snake_len', default=10,
+                        type=int, help='Minimum accepted snake length for a record')
+    parser.add_argument('--min_accepted_tick', default=50,
+                        type=int, help='Minimum accepted tick for a record')
+    parser.add_argument('--max_retries', default=5, type=int,
+                        help='Maximum retries for a record')
+    parser.add_argument('--debug', action='store_true',
+                        default=False, help='Debug mode')
 
     args = parser.parse_args()
-
 
     # Here you can add the logic to handle the parsed arguments
     try:
@@ -205,6 +239,7 @@ def main():
         if args.debug:
             traceback.print_exc()
         sys.exit(1)
+
 
 if __name__ == '__main__':
     main()

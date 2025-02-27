@@ -7,9 +7,10 @@ This class is responsible for visualizing the game state.
 We will load a json file that contains individual game-states and render them on the screen.
 '''
 
+
 class Visualizer:
 
-    def __init__(self, width:int=800, height:int=600, default_render_speed=2, snake_color=(0, 0, 255), red_color=(255, 0, 0), green_color=(0, 255, 0), background_color=(0, 0, 0)):
+    def __init__(self, width: int = 800, height: int = 600, default_render_speed=2, snake_color=(0, 0, 255), red_color=(255, 0, 0), green_color=(0, 255, 0), background_color=(0, 0, 0)):
         ''' '''
         if width < 400 or height < 400:
             raise ValueError("Window size is too small")
@@ -42,7 +43,7 @@ class Visualizer:
             background_color[1]*0.2+snake_color[1]*0.8,
             background_color[2]*0.2+snake_color[2]*0.8)
 
-    def load_game(self, path:str):
+    def load_game(self, path: str):
         '''
         Will load the game state from the given json file
         A frame should be a dictionary as follow:
@@ -67,8 +68,7 @@ class Visualizer:
         self.last_frame_index = len(self.frames) - 1
         print(f"Loaded {len(self.frames)} frames")
 
-
-    def generate_frame(self, index:int):
+    def generate_frame(self, index: int):
         '''
         Will return an image of the game state at the given index
         '''
@@ -93,18 +93,19 @@ class Visualizer:
         for i, s in enumerate(snake):
             x, y = s
             color = self.snake_head_color if i == 0 else self.snake_body_color
-            pygame.draw.rect(surface, color, (x*cell_width, y*cell_height, cell_width, cell_height))
+            pygame.draw.rect(surface, color, (x*cell_width,
+                             y*cell_height, cell_width, cell_height))
         # Draw the green apple
         for g in green:
             x, y = g
-            pygame.draw.rect(surface, self.green_color, (x*cell_width, y*cell_height, cell_width, cell_height))
+            pygame.draw.rect(surface, self.green_color,
+                             (x*cell_width, y*cell_height, cell_width, cell_height))
         # Draw the red apple
         for r in red:
             x, y = r
-            pygame.draw.rect(surface, self.red_color, (x*cell_width, y*cell_height, cell_width, cell_height))
+            pygame.draw.rect(surface, self.red_color, (x*cell_width,
+                             y*cell_height, cell_width, cell_height))
         return surface
-
-
 
     def step_forward(self):
         '''
@@ -115,7 +116,6 @@ class Visualizer:
         self.current_frame += 1
         return self.generate_frame(self.current_frame)
 
-
     def step_backward(self):
         '''
         Will render the previous frame
@@ -125,7 +125,7 @@ class Visualizer:
         self.current_frame -= 1
         return self.generate_frame(self.current_frame)
 
-    def sim_speed(self, speed:float):
+    def sim_speed(self, speed: float):
         '''
         Will change the simulation speed
         '''
@@ -144,7 +144,8 @@ class Visualizer:
             print("No frames loaded")
             return
         pygame.init()
-        screen = pygame.display.set_mode((self.window_width, self.window_height))
+        screen = pygame.display.set_mode(
+            (self.window_width, self.window_height))
         pygame.display.set_caption("Snake Game Visualizer")
         print("Press the left and right arrow keys to navigate the frames, press escape to exit")
         clock = pygame.time.Clock()
@@ -165,19 +166,23 @@ class Visualizer:
                         if not mode:
                             self.step_backward()
                             update = True
-                        else: self.sim_speed(-0.5)
+                        else:
+                            self.sim_speed(-0.5)
                     elif event.key == pygame.K_RIGHT:
                         if not mode:
                             self.step_forward()
                             update = True
-                        else: self.sim_speed(1)
+                        else:
+                            self.sim_speed(1)
                     elif event.key == pygame.K_SPACE:
                         mode = not mode
                         print(f"Mode: {'Auto' if mode else 'Manual'}")
             screen.fill((0, 0, 0))
             if mode or update or not surface:
-                if mode: surface = self.step_forward()
-                else: surface = self.generate_frame(self.current_frame)
+                if mode:
+                    surface = self.step_forward()
+                else:
+                    surface = self.generate_frame(self.current_frame)
                 update = False
             if surface:
                 screen.blit(surface, (0, 0))
@@ -185,5 +190,6 @@ class Visualizer:
                 print("No frame to render")
                 mode = False
             pygame.display.flip()
-            clock.tick((self.auto_render_speed if mode else self.default_render_speed))
+            clock.tick(
+                (self.auto_render_speed if mode else self.default_render_speed))
         pygame.quit()

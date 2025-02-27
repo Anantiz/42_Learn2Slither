@@ -5,10 +5,12 @@ import torch
 
 MAGIC_EMPTY_VALUE = 999999
 
+
 class Simulator:
     """
     Rules: For all simulators, action=0 is the default action when the agent has not yet an action-list. It is thus expected to mostly do nothing.
     """
+
     def __init__(self):
         pass
 
@@ -27,6 +29,7 @@ class Simulator:
         print(f"{RED}Simulator.step() not implemented{RESET}")
         return None, 0
 
+
 class SnakeSimulator(Simulator):
 
     '''
@@ -41,8 +44,10 @@ class SnakeSimulator(Simulator):
     Coordinates are between 0 and map_size - 1
     '''
 
-    action_map = { 0 : "up", 1 : "left", 2 : "down", 3 : "right"} # Don't change the values
-    action_result = {"dead-wall", "dead-self", "dead-red-apple", "red-apple", "green-apple", "nothing"}
+    action_map = {0: "up", 1: "left", 2: "down",
+                  3: "right"}  # Don't change the values
+    action_result = {"dead-wall", "dead-self",
+                     "dead-red-apple", "red-apple", "green-apple", "nothing"}
     rewards = {
         "dead-wall": -100,
         "dead-self": -100,
@@ -66,7 +71,7 @@ class SnakeSimulator(Simulator):
         self.red_apple_pos: set[tuple] = set()
         self.done = False
 
-    def rework_state_representation_kevin(self, state:torch.Tensor) -> torch.Tensor:
+    def rework_state_representation_kevin(self, state: torch.Tensor) -> torch.Tensor:
         ''' The model performs like a Orangutan on a unicycle, mayhaps it needs glasses '''
         # Current state is a 4x4 matrix where for each direction we have: dist-red(bad), dist-green(good), dist-body, dist-wall
         # And something that is not see has dist=0 which i guess is stupid
@@ -81,9 +86,12 @@ class SnakeSimulator(Simulator):
         new_state = torch.zeros(4, 2)
         for i in range(4):
             new_state[i, 0] = state[i, 1] if state[i, 1] > 0 else -state[i, 0]
-            new_state[i, 1] = state[i][2] if state[i][3] == 0 else state[i][3] if state[i][2] == 0 else min(state[i][2], state[i][3])
-            if new_state[i, 1] == 0: new_state[i, 1] = MAGIC_EMPTY_VALUE
-            if new_state[i, 0] == 0: new_state[i, 0] = MAGIC_EMPTY_VALUE
+            new_state[i, 1] = state[i][2] if state[i][3] == 0 else state[i][3] if state[i][2] == 0 else min(
+                state[i][2], state[i][3])
+            if new_state[i, 1] == 0:
+                new_state[i, 1] = MAGIC_EMPTY_VALUE
+            if new_state[i, 0] == 0:
+                new_state[i, 0] = MAGIC_EMPTY_VALUE
         return new_state
 
     def get_io_shape(self) -> tuple:
@@ -104,7 +112,8 @@ class SnakeSimulator(Simulator):
                     continue
                 pos = (x, y)
                 if pos in self.snake_body:
-                    print(f"{BLUE}H{RESET}" if pos == self.snake_body[0] else f"{CYAN}S{RESET}", end="")
+                    print(f"{BLUE}H{RESET}" if pos ==
+                          self.snake_body[0] else f"{CYAN}S{RESET}", end="")
                 elif pos in self.green_apple_pos:
                     print(f"{GREEN}G{RESET}", end="")
                 elif pos in self.red_apple_pos:
@@ -184,19 +193,19 @@ class SnakeSimulator(Simulator):
         head_x, head_y = head
         # Check directly wall colisions in the match, it is more code duplication but makes less comparisons per call
         match direction:
-            case 0: # up
+            case 0:  # up
                 head_y -= 1
                 if head_y < 0 or head_y == self.board_size:
                     return "dead-wall"
-            case 1: # left
+            case 1:  # left
                 head_x -= 1
                 if head_x < 0 or head_x == self.board_size:
                     return "dead-wall"
-            case 2: # down
+            case 2:  # down
                 head_y += 1
                 if head_y < 0 or head_y == self.board_size:
                     return "dead-wall"
-            case 3: # right
+            case 3:  # right
                 head_x += 1
                 if head_x < 0 or head_x == self.board_size:
                     return "dead-wall"
@@ -252,7 +261,8 @@ class SnakeSimulator(Simulator):
                 state[0][0] = i
             elif state[0][1] == 0 and (head_x, head_y - i) in self.green_apple_pos:
                 state[0][1] = i
-            elif state[0][2] == 0 and (head_x, head_y - i) in self.snake_body: # Refer to the closest body part
+            # Refer to the closest body part
+            elif state[0][2] == 0 and (head_x, head_y - i) in self.snake_body:
                 state[0][2] = i
         state[0][3] = head_y + 1
         # Left state[1]
@@ -323,7 +333,7 @@ class SnakeSimulator(Simulator):
                     return False
         return False
 
-    def get_reward(self, action , r) ->int:
+    def get_reward(self, action, r) -> int:
         if r != "nothing":
             return self.rewards[r]
         # Reward if the direction is
@@ -361,7 +371,7 @@ class SnakeSimulator(Simulator):
             print(f"Simulator can't step invalid action")
             return 0
         self.ticks += 1
-        if max_tick < 0: # Training
+        if max_tick < 0:  # Training
             if self.ticks > max_tick * -(self.snake_len - 2):
                 self.done = True
         elif self.ticks == max_tick:
