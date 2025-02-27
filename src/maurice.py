@@ -79,13 +79,11 @@ class Maurice:
 
         self.qtable[index][action] = q + self.lr * (reward + self.gamma * q_next - q)
 
-
     def update(self, experiences, batch_size=None):
         ''' batch_size is unused, there ain't no batch in Q-tables '''
         for s, a, r, sp, done in experiences:
             self.update_q_table(s, a, r, sp, done)
         self.epsilon = max(self.min_epsilon, self.epsilon * self.decay)
-
 
     def qna(self, state:Tensor, learning_on=True) -> int:
         '''

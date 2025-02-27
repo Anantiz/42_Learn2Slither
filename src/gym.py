@@ -10,6 +10,17 @@ from kevin import Kevin
 from maurice import Maurice
 from simulator import Simulator
 
+import signal
+import time
+
+MODEL = None
+IS_TRAINING = False
+
+def interupt_save_model(sig, frame):
+    if MODEL is not None and IS_TRAINING:
+        print(f"{colors.RED}Interupt signal received, saving model{colors.RESET}")
+        MODEL.save_weights()
+    exit(0)
 
 class Gym:
 
@@ -36,19 +47,22 @@ class Gym:
         Will use the given simulator instance and agent instance to run an episode.
         : return: a list of tuples (state:torch.tensor, action:int, reward:float)
         '''
+        is_kevin = isinstance(agent, Kevin)
         buff = []
         sim.init_episode()
-        state, done = sim.get_state()
+        state, done = sim.get_state(rework=is_kevin)
         action:int = agent.qna(state)
         reward:float = sim.step(action)
         prev_state = (state, action, reward) # s, a, r
         while True:
-            state, done = sim.get_state()
+            state, done = sim.get_state(rework=is_kevin)
             buff.append((prev_state[0], prev_state[1], prev_state[2], state, done)) # s, a, r, s', done
             if done: break
             action = agent.qna(state)
-            reward = sim.step(action)
+            reward = sim.step(action, max_tick=500)
             prev_state = (state, action, reward)
+        if len(buff) == 500 and sim.snake_len < 5:
+            return [] # This is just useless data of the snake going in circles, it will reinforce bad behavior if used
         return buff
 
     def _parallel_worker(self, agent, sim, requested_experiences_count, shared_experiences, lock):
@@ -75,7 +89,8 @@ class Gym:
                 p.join()
             return list(shared_experiences)
 
-    def train(self, epoch=1000, batch_size=256):
+    def train(self, epoch=1000, batch_size=64, save_file=None):
+        epoch = int(epoch)
         mod = 10
         if epoch >= 500:
             mod = 50
@@ -91,8 +106,16 @@ class Gym:
             self.brain.share_memory()
             batch_count = self.cpu_count * 2
         else:
-            batch_count = 16
+            batch_count = 2
             sim = self.sim_generator()
+
+        # Setup the signal handler if u get bored of a 50K epoch lol
+        global IS_TRAINING
+        global MODEL
+        IS_TRAINING = True
+        MODEL = self.brain
+        signal.signal(signal.SIGINT, interupt_save_model)
+
 
         experiences:list[tuple[Tensor, int, float, Tensor]] = list()
         for e in range(epoch):
@@ -107,28 +130,33 @@ class Gym:
             self.brain.update(experiences, batch_size=batch_size)
             experiences.clear()
         print(f"Epoch {epoch} done, average reward: {average_reward:0.2f}, epsilon: {self.brain.epsilon:0.4f}")
-        self.brain.save_weights() # I already have a Gazillion kevins and maurice in my directory
+        self.brain.save_weights(path=save_file) # I already have a Gazillion kevins and maurice in my directory
 
-    def test(self, cli_map=False, max_tick=1500):
+    def test(self, cli_map=False, max_tick=1500, render_speed=None):
         '''
         Test the model without training
         '''
+        is_kevin = isinstance(self.brain, Kevin)
         sim = self.sim_generator()
         sim.init_episode()
-
+        max_len = 0
         with torch.no_grad():
-            s, _ = sim.get_state()
+            s, _ = sim.get_state(rework=is_kevin)
             a = self.brain.qna(s, learning_on=False)
             r = sim.step(a)
             while True:
-                s, done = sim.get_state()
+                s, done = sim.get_state(rework=is_kevin)
                 if done: break
                 if cli_map:
                     sim.display_map_cli(snake_vision_only=True)
+                    if render_speed is not None:
+                        time.sleep(render_speed)
                 r += sim.step(self.brain.qna(s, learning_on=False), max_tick=max_tick)
+                max_len = max(max_len, sim.snake_len)
         ticks = sim.ticks
         snake_len = sim.snake_len
         print(f"{colors.CYAN}Simulation ended after {ticks} ticks, with a size of {snake_len}, average reward {r/ticks}{colors.RESET}")
+        return ticks, snake_len, r, max_len
 
     def test_record(self, record_file_path=None, max_tick=1500, min_acepted_snake_len=0, min_accepted_tick=0, max_retries=5) -> str:
         '''
@@ -140,6 +168,7 @@ class Gym:
         :param max_retries: the maximum number of retries before accepting the record regardless of the conditions
         returns: the path to the record file
         '''
+        is_kevin = isinstance(self.brain, Kevin)
         frames = []
         max_len = 0
         redo = True
@@ -148,7 +177,7 @@ class Gym:
             sim.init_episode()
             with torch.no_grad():
                 while True:
-                    s, done = sim.get_state()
+                    s, done = sim.get_state(rework=is_kevin)
                     if done: break
                     a = self.brain.qna(s, learning_on=False)
                     frames.append(sim.step_record(a, max_tick=max_tick))
@@ -173,4 +202,5 @@ class Gym:
             print(f"An error occured while saving the record: {e}")
             return None
         print(f"{colors.CYAN}Record saved as: {record_file_path}{colors.RESET}")
+        print(f"Simulation ended after {sim.ticks} ticks, with a final size of {sim.snake_len} and a maximum size of {max_len}")
         return record_file_path

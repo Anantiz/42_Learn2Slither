@@ -6,6 +6,8 @@ from numpy.random import randint
 import random
 import os
 
+
+
 def sampler_stochastic(experiences: list, batch_size) -> list[list]:
     '''
     :returns: a stochastic list of at-most batch_size lists of experiences (if not enough samples, the last list will be smaller)
@@ -40,19 +42,17 @@ class Dqn(nn.Module):
             print(f"Creating a neural network with input shape: {input_shape} and output count: {action_dim}")
         self.input_shape = input_shape
         input_size = input_shape[0] * input_shape[1]
-        scale = 32
+        scale = 16
         self.fc1 = nn.Linear(input_size, 1 * scale)
-        self.fc2 = nn.Linear(1 * scale, 2 * scale)
-        self.fc3 = nn.Linear(2 * scale, 4 * scale)
-        self.fc4 = nn.Linear(4 * scale, action_dim)
+        self.fc2 = nn.Linear(1 * scale, 1 * scale)
+        self.fc3 = nn.Linear(1 * scale, action_dim)
 
     def forward(self, x:Tensor) -> Tensor:
         ''' x is a tensor, yo '''
         x = x.view(-1, self.input_shape[0] * self.input_shape[1])
         x = torch.relu(self.fc1(x))
         x = torch.relu(self.fc2(x))
-        x = torch.relu(self.fc3(x))
-        x = self.fc4(x)
+        x = self.fc3(x)
         return x
 
 class Kevin:
@@ -62,8 +62,11 @@ class Kevin:
     - Manages updating the neural network
     - Can compute the Q-values for you and return the best action
     '''
-    def __init__(self, input_shape: tuple, action_dim: int, load_model:str=None, lr=0.003, gamma=0.95, epsilon=1.0, min_epsilon=0.01, decay=0.995, target_update_freq=50):
+    def __init__(self, input_shape: tuple, action_dim: int, load_model:str=None, lr=0.003, gamma=0.95, epsilon=1.0, min_epsilon=0.01, decay=0.995, target_update_freq=25):
         ''' Hi I'm Kevin ! '''
+        # input_shape = (4, 2) # Cuz I hardcorded down-sizing, not clean but it works
+        # action_dim = 4 # still 4 actions
+
         if load_model is not None:
             self.dqn = torch.load(load_model)
             print(f"Loaded neural network from: {load_model}")

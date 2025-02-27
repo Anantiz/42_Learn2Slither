@@ -2,7 +2,8 @@ from colors import *
 from random import randint
 from collections import deque
 import torch
-import math
+
+MAGIC_EMPTY_VALUE = 999999
 
 class Simulator:
     """
@@ -48,16 +49,42 @@ class SnakeSimulator(Simulator):
         "dead-red-apple": -50,
         "red-apple": -10,
         "green-apple": 100,
-        "nothing": 0.05
+        "nothing": -1
     }
 
-    def __init__(self, map_size=10, snake_len=3):
-        self.map_size = map_size
+    def __init__(self, board_size=10, snake_len=3):
+        if board_size > 1000:
+            print(f"{RED}Map size too large, keep it below a thousand{RESET}")
+            raise ValueError
+        if board_size < 5:
+            print(f"{RED}Map size too small, keep it above 5{RESET}")
+            raise ValueError
+        self.board_size = board_size
         self.snake_len = snake_len
         self.snake_body: deque[tuple[int, int]] = deque()
         self.green_apple_pos: set[tuple] = set()
         self.red_apple_pos: set[tuple] = set()
         self.done = False
+
+    def rework_state_representation_kevin(self, state:torch.Tensor) -> torch.Tensor:
+        ''' The model performs like a Orangutan on a unicycle, mayhaps it needs glasses '''
+        # Current state is a 4x4 matrix where for each direction we have: dist-red(bad), dist-green(good), dist-body, dist-wall
+        # And something that is not see has dist=0 which i guess is stupid
+
+        # Suggestions:
+        # - Merge body and wall cuz both ways you die, so it's kinda the same thing
+        # - FIND and dam WAY to explain the model that the North-values-Input are like NORTH lol, and South are SOUTH ...
+        # 1. Make good things (green apples) a positive distance, and bad things (red apples) a negative distance
+        #    keep walls as is, and merge body with walls, maybe the agent will want to minimize the value in the apple-category
+        #    and maximize the value in the wall/body category, so we go from 4x4 to 4x2
+        return state
+        new_state = torch.zeros(4, 2)
+        for i in range(4):
+            new_state[i, 0] = state[i, 1] if state[i, 1] > 0 else -state[i, 0]
+            new_state[i, 1] = state[i][2] if state[i][3] == 0 else state[i][3] if state[i][2] == 0 else min(state[i][2], state[i][3])
+            if new_state[i, 1] == 0: new_state[i, 1] = MAGIC_EMPTY_VALUE
+            if new_state[i, 0] == 0: new_state[i, 0] = MAGIC_EMPTY_VALUE
+        return new_state
 
     def get_io_shape(self) -> tuple:
         """ Return: (State-size, Action-size) """
@@ -67,11 +94,11 @@ class SnakeSimulator(Simulator):
         """TODO: Be careful, you are not allowed to turn in this, it should only display the snake vision"""
         snake_head_x, snake_head_y = self.snake_body[0]
         print(f"{BOLD}", end="")
-        print("W" * (self.map_size + 2), end="")
+        print("W" * (self.board_size + 2), end="")
         print(f"{RESET}")
-        for y in range(self.map_size):
+        for y in range(self.board_size):
             print(f"{BOLD}W{RESET}", end="")
-            for x in range(self.map_size):
+            for x in range(self.board_size):
                 if x != snake_head_x and y != snake_head_y:
                     print("?", end="")
                     continue
@@ -86,7 +113,7 @@ class SnakeSimulator(Simulator):
                     print(f"{YELLOW}0{RESET}", end="")
             print(f"{BOLD}W{RESET}")
         print(f"{BOLD}", end="")
-        print("W" * (self.map_size + 2), end="")
+        print("W" * (self.board_size + 2), end="")
         print(f"{RESET}\n")
 
     def generate_json_frame(self):
@@ -95,7 +122,7 @@ class SnakeSimulator(Simulator):
         """
         return {
             "id": self.ticks,
-            "msize": [self.map_size, self.map_size],
+            "msize": [self.board_size, self.board_size],
             "snake": list(self.snake_body),
             "green": list(self.green_apple_pos),
             "red": list(self.red_apple_pos)
@@ -106,12 +133,12 @@ class SnakeSimulator(Simulator):
         :param initial_size: initial size of the snake
         Randomly spawn the sanke, the body shall be contiguous
         """
-        if self.map_size < initial_size:
+        if self.board_size < initial_size:
             print(f"{RED}Map size too small for the snake{RESET}")
             raise ValueError
         self.snake_len = initial_size
-        x = randint(0, self.map_size - 1)
-        y = randint(0, self.map_size - 1)
+        x = randint(0, self.board_size - 1)
+        y = randint(0, self.board_size - 1)
         # Find a direction to contiguously spawn the snake
         self.snake_body.clear()
         self.snake_body.append((x, y))
@@ -121,7 +148,7 @@ class SnakeSimulator(Simulator):
         elif y > initial_size:
             for i in range(1, initial_size):
                 self.snake_body.append((x, y - i))
-        elif x < self.map_size - initial_size:
+        elif x < self.board_size - initial_size:
             for i in range(1, initial_size):
                 self.snake_body.append((x + i, y))
         else:
@@ -130,8 +157,8 @@ class SnakeSimulator(Simulator):
 
     def spawn_green_apple(self, n=1):
         while n > 0:
-            x = randint(0, self.map_size - 1)
-            y = randint(0, self.map_size - 1)
+            x = randint(0, self.board_size - 1)
+            y = randint(0, self.board_size - 1)
             pos = (x, y)
             if pos in self.snake_body or pos in self.red_apple_pos:
                 continue
@@ -140,8 +167,8 @@ class SnakeSimulator(Simulator):
 
     def spawn_red_apple(self, n=1):
         while n > 0:
-            x = randint(0, self.map_size - 1)
-            y = randint(0, self.map_size - 1)
+            x = randint(0, self.board_size - 1)
+            y = randint(0, self.board_size - 1)
             pos = (x, y)
             if pos in self.snake_body or pos in self.green_apple_pos:
                 continue
@@ -159,19 +186,19 @@ class SnakeSimulator(Simulator):
         match direction:
             case 0: # up
                 head_y -= 1
-                if head_y < 0 or head_y == self.map_size:
+                if head_y < 0 or head_y == self.board_size:
                     return "dead-wall"
             case 1: # left
                 head_x -= 1
-                if head_x < 0 or head_x == self.map_size:
+                if head_x < 0 or head_x == self.board_size:
                     return "dead-wall"
             case 2: # down
                 head_y += 1
-                if head_y < 0 or head_y == self.map_size:
+                if head_y < 0 or head_y == self.board_size:
                     return "dead-wall"
             case 3: # right
                 head_x += 1
-                if head_x < 0 or head_x == self.map_size:
+                if head_x < 0 or head_x == self.board_size:
                     return "dead-wall"
             case _:
                 print(f"{RED}Invalid direction, fix your code !{RESET}")
@@ -200,7 +227,7 @@ class SnakeSimulator(Simulator):
             self.snake_body.appendleft(new_head_pos)
             return "nothing"
 
-    def get_state(self) -> tuple[torch.tensor, bool]:
+    def get_state(self, rework=False) -> tuple[torch.tensor, bool]:
         """
         Make a 4x4 matrix:
 
@@ -238,23 +265,23 @@ class SnakeSimulator(Simulator):
                 state[1][2] = i
         state[1][3] = head_x + 1
         # Down state[2]
-        for i in range(1, self.map_size - head_y):
+        for i in range(1, self.board_size - head_y):
             if state[2][0] == 0 and (head_x, head_y + i) in self.red_apple_pos:
                 state[2][0] = i
             elif state[2][1] == 0 and (head_x, head_y + i) in self.green_apple_pos:
                 state[2][1] = i
             elif state[2][2] == 0 and (head_x, head_y + i) in self.snake_body:
                 state[2][2] = i
-        state[2][3] = self.map_size - head_y
+        state[2][3] = self.board_size - head_y
         # Right state[3]
-        for i in range(1, self.map_size - head_x):
+        for i in range(1, self.board_size - head_x):
             if state[3][0] == 0 and (head_x + i, head_y) in self.red_apple_pos:
                 state[3][0] = i
             elif state[3][1] == 0 and (head_x + i, head_y) in self.green_apple_pos:
                 state[3][1] = i
             elif state[3][2] == 0 and (head_x + i, head_y) in self.snake_body:
                 state[3][2] = i
-        state[3][3] = self.map_size - head_x
+        state[3][3] = self.board_size - head_x
         return state, self.done
 
     def init_episode(self, green_apple_count=2, red_apple_count=1, initial_size=3) -> tuple[torch.tensor, list[int]]:
@@ -301,9 +328,9 @@ class SnakeSimulator(Simulator):
             return self.rewards[r]
         # Reward if the direction is
         if self.check_if_apple_in_dir(self.green_apple_pos, action):
-            return self.rewards["green-apple"] / 15
+            return self.rewards["green-apple"] / 20
         if self.check_if_apple_in_dir(self.red_apple_pos, action):
-            return self.rewards["red-apple"] / 10
+            return self.rewards["red-apple"] / 15
         return self.rewards[r]
 
     def step_record(self, action: int, max_tick=1500) -> tuple[bool, dict]:

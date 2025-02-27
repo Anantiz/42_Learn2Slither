@@ -9,7 +9,7 @@ We will load a json file that contains individual game-states and render them on
 
 class Visualizer:
 
-    def __init__(self, width:int=800, height:int=600, default_render_speed=0.5, snake_color=(0, 0, 255), red_color=(255, 0, 0), green_color=(0, 255, 0), background_color=(0, 0, 0)):
+    def __init__(self, width:int=800, height:int=600, default_render_speed=2, snake_color=(0, 0, 255), red_color=(255, 0, 0), green_color=(0, 255, 0), background_color=(0, 0, 0)):
         ''' '''
         if width < 400 or height < 400:
             raise ValueError("Window size is too small")
@@ -29,7 +29,7 @@ class Visualizer:
 
         self.current_frame = 0
         self.frames = None
-        self.auto_render_speed = 0.8
+        self.auto_render_speed = 1
         self.default_render_speed = default_render_speed
 
         self.red_color = red_color
@@ -132,8 +132,8 @@ class Visualizer:
         self.auto_render_speed += speed
         if self.auto_render_speed < 0.5:
             self.auto_render_speed = 0.5
-        elif self.auto_render_speed > 4:
-            self.auto_render_speed = 4
+        elif self.auto_render_speed > 6:
+            self.auto_render_speed = 6
         print(f"Simulation speed: {self.auto_render_speed} fps")
 
     def start(self):
@@ -170,7 +170,7 @@ class Visualizer:
                         if not mode:
                             self.step_forward()
                             update = True
-                        else: self.sim_speed(0.5)
+                        else: self.sim_speed(1)
                     elif event.key == pygame.K_SPACE:
                         mode = not mode
                         print(f"Mode: {'Auto' if mode else 'Manual'}")
