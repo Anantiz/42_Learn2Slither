@@ -6,7 +6,8 @@ from datetime import datetime
 
 class Maurice:
 
-    def __init__(self, state_shape, action_count, lr=0.05, gamma=0.95, epsilon=1.0, min_epsilon=0.015, decay=0.995, load_model=None):
+    def __init__(self, state_shape, action_count, lr=0.05, gamma=0.95,
+                 epsilon=1.0, min_epsilon=0.015, decay=0.995, load_model=None):
         self.lr = lr
         self.gamma = gamma
         self.epsilon = epsilon
@@ -26,15 +27,19 @@ class Maurice:
         [red-apple/green-apple/obstacle] for all 4 state at once
         '''
         dimmensions = [
-            3, 4]  # Cuz we down-size the state matrix we absolutely ignore state_shape *thug life*
+            3,
+            4]
         self.qtable = [[random.uniform(-1, 1) for _ in range(self.action_dim)]
                        for _ in range(2**(dimmensions[0] * dimmensions[1]))]
         print(
-            f"Initialized Q-table with width: {2**(dimmensions[0] * dimmensions[1])} and action count: {self.action_dim}")
+            f"Initialized Q-table with width: \
+                {2**(dimmensions[0] * dimmensions[1])} \
+                    and action count: {self.action_dim}")
 
     def save_weights(self, path: str = None):
         if not path:
-            path = f"saves/maurice/maurice_qtable_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.pt"
+            date = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+            path = f"saves/maurice/maurice_qtable_{date}.pt"
             if not os.path.exists("saves/maurice"):
                 os.makedirs("saves/maurice")
         with open(path, "w") as f:
@@ -56,29 +61,31 @@ class Maurice:
         for i in range(len(state)):
             red = state[i][0] if state[i][0] != 0 else 99999
             green = state[i][1] if state[i][1] != 0 else 99999
-            obstacle = state[i][2] if state[i][3] == 0 else state[i][3] if state[i][2] == 0 else min(
+            obstacle = state[i][2] if state[i][3] == 0 else state[i][3] \
+                if state[i][2] == 0 else min(
                 state[i][2], state[i][3])
             if obstacle == 0:
                 obstacle = 99999
             # make it 2*i cuz a field is 2 bits
             if red < green and red < obstacle:
-                index |= 0b01 << 3*i
+                index |= 0b01 << 3 * i
             elif green < red and green < obstacle:
-                index |= 0b10 << 3*i
+                index |= 0b10 << 3 * i
             elif obstacle == 1:
-                index |= 0b11 << 3*i
+                index |= 0b11 << 3 * i
             else:
-                index |= 0b100 << 3*i
+                index |= 0b100 << 3 * i
         return index
 
-    def update_q_table(self, state: Tensor, action: int, reward: float, next_state: Tensor, done):
+    def update_q_table(self, state: Tensor, action: int,
+                       reward: float, next_state: Tensor, done):
         '''
         Will update the Q-table with the given experience
         '''
         index = self.index_state(state)
         q = self.qtable[index][action]
 
-        if done:  # Terminal state, indeed terribly slow way to check, but i ain't got that faith in me to edit 15 more lines today
+        if done:
             q_next = 0
         else:
             next_index = self.index_state(next_state)

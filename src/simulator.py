@@ -1,14 +1,23 @@
-from colors import *
 from random import randint
 from collections import deque
 import torch
 
+RED = "\033[1;31m"
+GREEN = "\033[1;32m"
+YELLOW = "\033[1;33m"
+BLUE = "\033[1;34m"
+MAGENTA = "\033[1;35m"
+CYAN = "\033[1;36m"
+RESET = "\033[0;0m"
+BOLD = "\033[;1m"
 MAGIC_EMPTY_VALUE = 999999
 
 
 class Simulator:
     """
-    Rules: For all simulators, action=0 is the default action when the agent has not yet an action-list. It is thus expected to mostly do nothing.
+    Rules: For all simulators, action=0 is the default action when
+    the agent has not yet an action-list. It is thus expected to
+    mostly do nothing.
     """
 
     def __init__(self):
@@ -16,7 +25,8 @@ class Simulator:
 
     def init_episode(self) -> tuple[int, list[int]]:
         """
-        called to initialize the simulator and get the initial state and possible actions for a new episode
+        called to initialize the simulator and get the initial state
+        and possible actions for a new episode
         """
         print(f"{RED}Simulator.init() not implemented{RESET}")
         return 0, []
@@ -71,35 +81,13 @@ class SnakeSimulator(Simulator):
         self.red_apple_pos: set[tuple] = set()
         self.done = False
 
-    def rework_state_representation_kevin(self, state: torch.Tensor) -> torch.Tensor:
-        ''' The model performs like a Orangutan on a unicycle, mayhaps it needs glasses '''
-        # Current state is a 4x4 matrix where for each direction we have: dist-red(bad), dist-green(good), dist-body, dist-wall
-        # And something that is not see has dist=0 which i guess is stupid
-
-        # Suggestions:
-        # - Merge body and wall cuz both ways you die, so it's kinda the same thing
-        # - FIND and dam WAY to explain the model that the North-values-Input are like NORTH lol, and South are SOUTH ...
-        # 1. Make good things (green apples) a positive distance, and bad things (red apples) a negative distance
-        #    keep walls as is, and merge body with walls, maybe the agent will want to minimize the value in the apple-category
-        #    and maximize the value in the wall/body category, so we go from 4x4 to 4x2
-        return state
-        new_state = torch.zeros(4, 2)
-        for i in range(4):
-            new_state[i, 0] = state[i, 1] if state[i, 1] > 0 else -state[i, 0]
-            new_state[i, 1] = state[i][2] if state[i][3] == 0 else state[i][3] if state[i][2] == 0 else min(
-                state[i][2], state[i][3])
-            if new_state[i, 1] == 0:
-                new_state[i, 1] = MAGIC_EMPTY_VALUE
-            if new_state[i, 0] == 0:
-                new_state[i, 0] = MAGIC_EMPTY_VALUE
-        return new_state
-
     def get_io_shape(self) -> tuple:
         """ Return: (State-size, Action-size) """
         return (4, 4), 4
 
     def display_map_cli(self, snake_vision_only=False):
-        """TODO: Be careful, you are not allowed to turn in this, it should only display the snake vision"""
+        """TODO: Be careful, you are not allowed to turn in this, it
+        should only display the snake vision"""
         snake_head_x, snake_head_y = self.snake_body[0]
         print(f"{BOLD}", end="")
         print("W" * (self.board_size + 2), end="")
@@ -187,11 +175,13 @@ class SnakeSimulator(Simulator):
     def move_snake(self, direction: int) -> str:
         """
         :param direction: direction of the movement
-        return: action result (dead-wall, dead-self, dead-red-apple, red-apple, green-apple, nothing)
+        return: action result (dead-wall, dead-self, dead-red-apple,
+        red-apple, green-apple, nothing)
         """
         head: tuple = self.snake_body[0]
         head_x, head_y = head
-        # Check directly wall colisions in the match, it is more code duplication but makes less comparisons per call
+        # Check directly wall colisions in the match, it is more code
+        # duplication but makes less comparisons per call
         match direction:
             case 0:  # up
                 head_y -= 1
@@ -248,7 +238,8 @@ class SnakeSimulator(Simulator):
         :return: state tensor, done: True if the game is over
         """
 
-        # You can Optimize all of this by simply searching if the apples are in the same row or column as the head
+        # You can Optimize all of this by simply searching if the apples are
+        # in the same row or column as the head
         # instead of checking all the way to the head, BUT, too lazy
         state = torch.zeros((4, 4), dtype=torch.float32)
         if self.done:
@@ -259,7 +250,8 @@ class SnakeSimulator(Simulator):
         for i in range(1, head_y + 1):
             if state[0][0] == 0 and (head_x, head_y - i) in self.red_apple_pos:
                 state[0][0] = i
-            elif state[0][1] == 0 and (head_x, head_y - i) in self.green_apple_pos:
+            elif state[0][1] == 0 and (head_x, head_y - i) \
+                    in self.green_apple_pos:
                 state[0][1] = i
             # Refer to the closest body part
             elif state[0][2] == 0 and (head_x, head_y - i) in self.snake_body:
@@ -269,7 +261,8 @@ class SnakeSimulator(Simulator):
         for i in range(1, head_x + 1):
             if state[1][0] == 0 and (head_x - i, head_y) in self.red_apple_pos:
                 state[1][0] = i
-            elif state[1][1] == 0 and (head_x - i, head_y) in self.green_apple_pos:
+            elif state[1][1] == 0 and (head_x - i, head_y) \
+                    in self.green_apple_pos:
                 state[1][1] = i
             elif state[1][2] == 0 and (head_x - i, head_y) in self.snake_body:
                 state[1][2] = i
@@ -278,7 +271,8 @@ class SnakeSimulator(Simulator):
         for i in range(1, self.board_size - head_y):
             if state[2][0] == 0 and (head_x, head_y + i) in self.red_apple_pos:
                 state[2][0] = i
-            elif state[2][1] == 0 and (head_x, head_y + i) in self.green_apple_pos:
+            elif state[2][1] == 0 and (head_x, head_y + i) \
+                    in self.green_apple_pos:
                 state[2][1] = i
             elif state[2][2] == 0 and (head_x, head_y + i) in self.snake_body:
                 state[2][2] = i
@@ -287,16 +281,19 @@ class SnakeSimulator(Simulator):
         for i in range(1, self.board_size - head_x):
             if state[3][0] == 0 and (head_x + i, head_y) in self.red_apple_pos:
                 state[3][0] = i
-            elif state[3][1] == 0 and (head_x + i, head_y) in self.green_apple_pos:
+            elif state[3][1] == 0 and (head_x + i, head_y) \
+                    in self.green_apple_pos:
                 state[3][1] = i
             elif state[3][2] == 0 and (head_x + i, head_y) in self.snake_body:
                 state[3][2] = i
         state[3][3] = self.board_size - head_x
         return state, self.done
 
-    def init_episode(self, green_apple_count=2, red_apple_count=1, initial_size=3) -> tuple[torch.tensor, list[int]]:
+    def init_episode(self, green_apple_count=2, red_apple_count=1,
+                     initial_size=3) -> tuple[torch.tensor, list[int]]:
         """
-        called to initialize the simulator and get the initial state and possible actions
+        called to initialize the simulator and get the initial
+        state and possible actions
         """
         self.ticks = 0
         self.spawn_snake(initial_size=initial_size)
@@ -350,7 +347,7 @@ class SnakeSimulator(Simulator):
         return: done, frame
         """
         if action not in {0, 1, 2, 3}:
-            print(f"Simulator can't step invalid action")
+            print("Simulator can't step invalid action")
             raise ValueError
         self.ticks += 1
         if self.ticks == max_tick:
@@ -361,14 +358,16 @@ class SnakeSimulator(Simulator):
             self.done = True
         return self.generate_json_frame()
 
-    def step(self, action: int, max_tick=-100) -> tuple[torch.tensor, list[int]]:
+    def step(self, action: int, max_tick=-
+             100) -> tuple[torch.tensor, list[int]]:
         """
         :param action: action taken by the agent
-        :max_tick: maximum number of ticks before the game ends, negative values set training mode
+        :max_tick: maximum number of ticks before the game ends,
+        negative values set training mode
         :return: next state and reward of last action
         """
         if action not in {0, 1, 2, 3}:
-            print(f"Simulator can't step invalid action")
+            print("Simulator can't step invalid action")
             return 0
         self.ticks += 1
         if max_tick < 0:  # Training

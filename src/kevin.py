@@ -9,7 +9,8 @@ import os
 
 def sampler_stochastic(experiences: list, batch_size) -> list[list]:
     '''
-    :returns: a stochastic list of at-most batch_size lists of experiences (if not enough samples, the last list will be smaller)
+    :returns: a stochastic list of at-most batch_size lists of experiences
+    (if not enough samples, the last list will be smaller)
     '''
     if not isinstance(experiences, list):
         raise ValueError("Experiences must be a list")
@@ -18,7 +19,8 @@ def sampler_stochastic(experiences: list, batch_size) -> list[list]:
     size = len(experiences)
     if not (0 < batch_size <= size):
         raise ValueError(
-            "Batch size must be greater than 0 and less than or equal to the length of experiences")
+            "Batch size must be greater than 0 and less than or equal\
+                to the length of experiences")
 
     random.shuffle(experiences)  # Shuffle the experiences to ensure randomness
     return [experiences[i:i + batch_size] for i in range(0, size, batch_size)]
@@ -30,7 +32,8 @@ class Dqn(nn.Module):
         '''
         :param input_shape: the shape of the input tensor
         :param action_dim: the number of actions the agent can take
-        :param skip_init: if True, the model will not be initialized, useful for loading a model from a file
+        :param skip_init: if True, the model will not be initialized,
+        useful for loading a model from a file
         '''
         super().__init__()
         if not isinstance(input_shape, tuple):
@@ -41,7 +44,8 @@ class Dqn(nn.Module):
 
         if not skip_init:
             print(
-                f"Creating a neural network with input shape: {input_shape} and output count: {action_dim}")
+                f"Creating a neural network with input shape: {input_shape} \
+                    and output count: {action_dim}")
         self.input_shape = input_shape
         input_size = input_shape[0] * input_shape[1]
         scale = 16
@@ -66,11 +70,18 @@ class Kevin:
     - Can compute the Q-values for you and return the best action
     '''
 
-    def __init__(self, input_shape: tuple, action_dim: int, load_model: str = None, lr=0.003, gamma=0.95, epsilon=1.0, min_epsilon=0.01, decay=0.995, target_update_freq=25):
+    def __init__(
+            self,
+            input_shape: tuple,
+            action_dim: int,
+            load_model: str = None,
+            lr=0.003,
+            gamma=0.95,
+            epsilon=1.0,
+            min_epsilon=0.01,
+            decay=0.995,
+            target_update_freq=25):
         ''' Hi I'm Kevin ! '''
-        # input_shape = (4, 2) # Cuz I hardcorded down-sizing, not clean but it works
-        # action_dim = 4 # still 4 actions
-
         if load_model is not None:
             self.dqn = torch.load(load_model)
             print(f"Loaded neural network from: {load_model}")
@@ -93,7 +104,8 @@ class Kevin:
 
     def save_weights(self, path: str = None):
         if not path:
-            path = f"saves/kevin/kevin_nn_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.pt"
+            date = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+            path = f"saves/kevin/kevin_nn_{date}.pt"
             if not os.path.exists("saves/kevin"):
                 os.makedirs("saves/kevin")
         torch.save(self.dqn, path)
@@ -103,14 +115,18 @@ class Kevin:
         self.dqn.share_memory()
         self.dqn_target.share_memory()
 
-    def update(self, experiences: list[tuple[Tensor, int, float, Tensor]], batch_size=32):
+    def update(
+            self, experiences: list[tuple], batch_size=32):
         """
         Update the policy using the given experiences.
 
         Args:
-            experiences (list[tuple[Tensor, int, float, Tensor]]): A list of experiences, where each experience is a tuple containing
-                a state (Tensor), an action (int), and a reward (float), state_prime (Tensor).
-            batch_size (int, optional): The size of each batch for stochastic sampling. Default is 32.
+            experiences (list[tuple[Tensor, int, float, Tensor]]): A list
+            of experiences, where each experience is a tuple containing
+                a state (Tensor), an action (int), and a reward (float),
+                state_prime (Tensor).
+            batch_size (int, optional): The size of each batch for
+            stochastic sampling. Default is 32.
 
         Returns:
             None
@@ -125,7 +141,8 @@ class Kevin:
         for batch in batches:
             if len(batch) == 0:  # What ?
                 continue
-            states, actions, rewards, next_states, done_mask = [], [], [], [], []
+            states, actions, rewards, next_states = [], [], [], []
+            done_mask = []
             for item in batch:
                 states.append(item[0])
                 actions.append(item[1])

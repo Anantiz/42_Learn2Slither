@@ -4,24 +4,39 @@ import json
 
 '''
 This class is responsible for visualizing the game state.
-We will load a json file that contains individual game-states and render them on the screen.
+We will load a json file that contains individual game-states an
+render them on the screen.
 '''
 
 
 class Visualizer:
 
-    def __init__(self, width: int = 800, height: int = 600, default_render_speed=2, snake_color=(0, 0, 255), red_color=(255, 0, 0), green_color=(0, 255, 0), background_color=(0, 0, 0)):
+    def __init__(
+        self, width: int = 800, height: int = 600, default_render_speed=2,
+        snake_color=(
+            0, 0, 255), red_color=(
+            255, 0, 0), green_color=(
+                0, 255, 0), background_color=(
+                    0, 0, 0)):
         ''' '''
         if width < 400 or height < 400:
             raise ValueError("Window size is too small")
         if width > 1920 or height > 1080:
             raise ValueError("Window size is too big")
-        if type(snake_color) is not tuple or type(red_color) is not tuple or type(green_color) is not tuple or type(background_color) is not tuple:
+        if type(snake_color) is \
+            not tuple or type(red_color) is not tuple or type(
+                green_color) is \
+                not tuple or type(background_color) is not tuple:
             raise ValueError("Colors must be tuples")
-        if len(snake_color) != 3 or len(red_color) != 3 or len(green_color) != 3 or len(background_color) != 3:
+        if len(snake_color) != 3 or len(red_color) != 3 or len(
+                green_color) != 3 or len(background_color) != 3:
             raise ValueError("Colors must be RGB tuples")
         for i in range(3):
-            if not (0 <= snake_color[i] <= 255) or not (0 <= red_color[i] <= 255) or not (0 <= green_color[i] <= 255) or not (0 <= background_color[i] <= 255):
+            if not (
+                0 <= snake_color[i] <= 255) or not (
+                0 <= red_color[i] <= 255) or not (
+                0 <= green_color[i] <= 255) or not (
+                    0 <= background_color[i] <= 255):
                 raise ValueError("Color values must be between 0 and 255")
 
         self.window_width = width
@@ -39,9 +54,9 @@ class Visualizer:
 
         self.snake_head_color = snake_color
         self.snake_body_color = (
-            background_color[0]*0.2+snake_color[0]*0.8,
-            background_color[1]*0.2+snake_color[1]*0.8,
-            background_color[2]*0.2+snake_color[2]*0.8)
+            background_color[0] * 0.2 + snake_color[0] * 0.8,
+            background_color[1] * 0.2 + snake_color[1] * 0.8,
+            background_color[2] * 0.2 + snake_color[2] * 0.8)
 
     def load_game(self, path: str):
         '''
@@ -93,18 +108,23 @@ class Visualizer:
         for i, s in enumerate(snake):
             x, y = s
             color = self.snake_head_color if i == 0 else self.snake_body_color
-            pygame.draw.rect(surface, color, (x*cell_width,
-                             y*cell_height, cell_width, cell_height))
+            pygame.draw.rect(surface, color, (x * cell_width,
+                             y * cell_height, cell_width, cell_height))
         # Draw the green apple
         for g in green:
             x, y = g
-            pygame.draw.rect(surface, self.green_color,
-                             (x*cell_width, y*cell_height, cell_width, cell_height))
+            pygame.draw.rect(
+                surface,
+                self.green_color,
+                (x * cell_width,
+                 y * cell_height,
+                 cell_width,
+                 cell_height))
         # Draw the red apple
         for r in red:
             x, y = r
-            pygame.draw.rect(surface, self.red_color, (x*cell_width,
-                             y*cell_height, cell_width, cell_height))
+            pygame.draw.rect(surface, self.red_color, (x * cell_width,
+                             y * cell_height, cell_width, cell_height))
         return surface
 
     def step_forward(self):
@@ -147,7 +167,8 @@ class Visualizer:
         screen = pygame.display.set_mode(
             (self.window_width, self.window_height))
         pygame.display.set_caption("Snake Game Visualizer")
-        print("Press the left and right arrow keys to navigate the frames, press escape to exit")
+        print("Press the left and right arrow keys to navigate the frames,\
+            press escape to exit")
         clock = pygame.time.Clock()
         running = True
         mode = False
@@ -191,5 +212,6 @@ class Visualizer:
                 mode = False
             pygame.display.flip()
             clock.tick(
-                (self.auto_render_speed if mode else self.default_render_speed))
+                (self.auto_render_speed if
+                    mode else self.default_render_speed))
         pygame.quit()
