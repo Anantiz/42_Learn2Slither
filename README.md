@@ -9,17 +9,19 @@ Setup & usage:
 Here are the main arguments you might want to use:
 
 1. Train your models, they will save to default location /save/the_model
-    --train epoch_count 
+    `--train <int: epoch_count> `
         You can add optional flag to edit hyper parameters
-        --epsilon [float: 0 < ARG < 1] 
-        --decay [float] 
-        --lr [float] 
-        --batch_size [int]
+        `--epsilon [float: 0 < ARG < 1] `
+        `--decay [float]` 
+        `--lr [float] `
+        `--batch_size [int]`
+       You can also start from a pretrained model:
+       `--load_model <model_path>`
    
 3. You can test the model this way:
-    --test number_of_sim_to_run --load_model <model_path>
+    `--test <int: number_of_sim_to_run> --load_model <model_path>`
     
 3. You can Record a model-sim and the visualize it in a GUI
-        --record --load_model <model_path>
-        --visualize <record_path>
+        `--record --load_model <model_path>`
+        `--visualize <record_path>`
     
