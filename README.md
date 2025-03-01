@@ -5,8 +5,9 @@ Setup & usage:
     pip install -r requirements.txt
     ./src/main.py <ARGS>
 
-#Usage
+# Usage
 Here are the main arguments you might want to use:
+
     1. Train your models, they will save to default location /save/the_model
     --train epoch_count 
         You can add optional flag to edit hyper parameters
