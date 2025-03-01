@@ -10,12 +10,12 @@ Here are the main arguments you might want to use:
 
 1. Train your models, they will save to default location /save/the_model
     `--train <int: epoch_count> `
-    You can add optional flag to edit hyper parameters
+You can add optional flag to edit hyper parameters
         `--epsilon [float: 0 < ARG < 1] `
         `--decay [float]` 
         `--lr [float] `
         `--batch_size [int]`
-   You can also start from a pretrained model:
+You can also start from a pretrained model:
        `--load_model <model_path>`
    
 3. You can test the model this way:
