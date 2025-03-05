@@ -24,4 +24,8 @@ You can also start from a pretrained model:
 3. You can Record a model-sim and the visualize it in a GUI
         `--record --load_model <model_path>`
         `--visualize <record_path>`
+
+# Resources to learn about QLearning:
+
+ -https://www.davidsilver.uk/wp-content/uploads/2020/03/deep_rl_tutorial_small_compressed.pdf
     
